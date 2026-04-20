@@ -118,7 +118,11 @@ CHANNELS = [
 # これは個人の人生のテーマを示す最重要要素
 
 def extract_gates_from_row(row):
-    """行データから全ゲートを抽出（ゲート番号のみ）"""
+    """行データから全ゲートを抽出（ゲート番号のみ）
+    
+    Parameters:
+        row: dict or pd.Series
+    """
     gates = set()
     
     # パーソナリティ（P_）とデザイン（D_）の全天体
@@ -132,11 +136,22 @@ def extract_gates_from_row(row):
     ]
     
     for col in planet_cols:
-        if col in row and pd.notna(row[col]):
-            gate_str = str(row[col])
-            # "38.1" → 38
-            gate_num = int(float(gate_str.split('.')[0]))
-            gates.add(gate_num)
+        try:
+            # dictとSeriesの両方に対応
+            if isinstance(row, dict):
+                value = row.get(col)
+            else:
+                # Pandas Series
+                value = row.get(col) if hasattr(row, 'get') else row[col] if col in row.index else None
+            
+            if value is not None and pd.notna(value):
+                gate_str = str(value)
+                # "38.1" → 38
+                gate_num = int(float(gate_str.split('.')[0]))
+                gates.add(gate_num)
+        except (KeyError, ValueError, AttributeError):
+            # カラムが存在しないか、変換できない場合はスキップ
+            continue
     
     return gates
 
@@ -165,20 +180,50 @@ def determine_defined_centers(active_channels):
     return defined_centers
 
 def get_incarnation_cross(row):
-    """インカネーションクロス（太陽・地球・ノードのゲート）を取得"""
+    """インカネーションクロス（太陽・地球・ノードのゲート）を取得
+    
+    Parameters:
+        row: dict or pd.Series
+    """
+    def safe_get(row, key):
+        """dictとSeriesの両方から安全に値を取得"""
+        try:
+            if isinstance(row, dict):
+                value = row.get(key)
+            else:
+                value = row.get(key) if hasattr(row, 'get') else row[key] if key in row.index else None
+            
+            if value is not None and pd.notna(value):
+                return int(float(str(value).split('.')[0]))
+            return None
+        except (KeyError, ValueError, AttributeError):
+            return None
+    
     cross = {
-        'P_Sun': int(float(str(row['P_Sun']).split('.')[0])) if pd.notna(row.get('P_Sun')) else None,
-        'P_Earth': int(float(str(row['P_Earth']).split('.')[0])) if pd.notna(row.get('P_Earth')) else None,
-        'P_NorthNode': int(float(str(row['P_NorthNode']).split('.')[0])) if pd.notna(row.get('P_NorthNode')) else None,
-        'P_SouthNode': int(float(str(row['P_SouthNode']).split('.')[0])) if pd.notna(row.get('P_SouthNode')) else None,
-        'D_Sun': int(float(str(row['D_Sun']).split('.')[0])) if pd.notna(row.get('D_Sun')) else None,
-        'D_Earth': int(float(str(row['D_Earth']).split('.')[0])) if pd.notna(row.get('D_Earth')) else None
+        'P_Sun': safe_get(row, 'P_Sun'),
+        'P_Earth': safe_get(row, 'P_Earth'),
+        'P_NorthNode': safe_get(row, 'P_NorthNode'),
+        'P_SouthNode': safe_get(row, 'P_SouthNode'),
+        'D_Sun': safe_get(row, 'D_Sun'),
+        'D_Earth': safe_get(row, 'D_Earth')
     }
     return cross
 
 def analyze_person_hd(row):
-    """1行のデータから個人のHD分析を実行"""
-    import pandas as pd
+    """1行のデータから個人のHD分析を実行
+    
+    Parameters:
+        row: dict or pd.Series
+    """
+    def safe_get(row, key, default='不明'):
+        """dictとSeriesの両方から安全に値を取得"""
+        try:
+            if isinstance(row, dict):
+                return row.get(key, default)
+            else:
+                return row.get(key, default) if hasattr(row, 'get') else row[key] if key in row.index else default
+        except (KeyError, AttributeError):
+            return default
     
     # ゲート抽出
     gates = extract_gates_from_row(row)
@@ -202,10 +247,10 @@ def analyze_person_hd(row):
         'defined_centers': list(defined_centers),
         'undefined_centers': undefined_centers,
         'incarnation_cross': incarnation_cross,
-        'type': row.get('Type', '不明'),
-        'profile': row.get('Profile', '不明'),
-        'definition': row.get('Definition_Type', '不明'),
-        'authority': row.get('Authority', '不明')
+        'type': safe_get(row, 'Type', '不明'),
+        'profile': safe_get(row, 'Profile', '不明'),
+        'definition': safe_get(row, 'Definition_Type', '不明'),
+        'authority': safe_get(row, 'Authority', '不明')
     }
 
 # テスト用
