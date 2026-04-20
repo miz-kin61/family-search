@@ -1,6 +1,6 @@
-# =====================================================================
-# HD ゲート・チャネル・センター定義判定ロジック
-# =====================================================================
+"""
+HD ゲート・チャネル・センター定義判定ロジック
+"""
 
 import pandas as pd
 
@@ -113,19 +113,19 @@ CHANNELS = [
     (32, 54, '直感', '活力', '32-54')
 ]
 
-# --- インカネーションクロス（重要チャネル）---
-# 太陽・地球・ノード（北・南）の4つのゲートで構成される
-# これは個人の人生のテーマを示す最重要要素
 
 def extract_gates_from_row(row):
-    """行データから全ゲートを抽出（ゲート番号のみ）
+    """
+    行データから全ゲートを抽出（ゲート番号のみ）
     
     Parameters:
         row: dict or pd.Series
+        
+    Returns:
+        set: ゲート番号の集合
     """
     gates = set()
     
-    # パーソナリティ（P_）とデザイン（D_）の全天体
     planet_cols = [
         'P_Sun', 'P_Earth', 'P_Moon', 'P_NorthNode', 'P_SouthNode',
         'P_Mercury', 'P_Venus', 'P_Mars', 'P_Jupiter', 'P_Saturn',
@@ -142,21 +142,33 @@ def extract_gates_from_row(row):
                 value = row.get(col)
             else:
                 # Pandas Series
-                value = row.get(col) if hasattr(row, 'get') else row[col] if col in row.index else None
+                if hasattr(row, 'get'):
+                    value = row.get(col)
+                elif col in row.index:
+                    value = row[col]
+                else:
+                    value = None
             
             if value is not None and pd.notna(value):
                 gate_str = str(value)
-                # "38.1" → 38
                 gate_num = int(float(gate_str.split('.')[0]))
                 gates.add(gate_num)
-        except (KeyError, ValueError, AttributeError):
-            # カラムが存在しないか、変換できない場合はスキップ
+        except (KeyError, ValueError, AttributeError, IndexError):
             continue
     
     return gates
 
+
 def find_active_channels(gates):
-    """アクティブなゲートセットからチャネルを判定"""
+    """
+    アクティブなゲートセットからチャネルを判定
+    
+    Parameters:
+        gates: set of gate numbers
+        
+    Returns:
+        list: アクティブなチャネルのリスト
+    """
     active_channels = []
     
     for gate1, gate2, center1, center2, channel_id in CHANNELS:
@@ -169,8 +181,17 @@ def find_active_channels(gates):
     
     return active_channels
 
+
 def determine_defined_centers(active_channels):
-    """アクティブなチャネルから定義されたセンターを判定"""
+    """
+    アクティブなチャネルから定義されたセンターを判定
+    
+    Parameters:
+        active_channels: list of active channels
+        
+    Returns:
+        set: 定義されたセンターの集合
+    """
     defined_centers = set()
     
     for channel in active_channels:
@@ -179,49 +200,69 @@ def determine_defined_centers(active_channels):
     
     return defined_centers
 
+
 def get_incarnation_cross(row):
-    """インカネーションクロス（太陽・地球・ノードのゲート）を取得
+    """
+    インカネーションクロス（太陽・地球・ノードのゲート）を取得
     
     Parameters:
         row: dict or pd.Series
+        
+    Returns:
+        dict: インカネーションクロスのゲート情報
     """
-    def safe_get(row, key):
-        """dictとSeriesの両方から安全に値を取得"""
+    def safe_get_gate(row, key):
+        """dictとSeriesの両方から安全にゲート番号を取得"""
         try:
             if isinstance(row, dict):
                 value = row.get(key)
             else:
-                value = row.get(key) if hasattr(row, 'get') else row[key] if key in row.index else None
+                if hasattr(row, 'get'):
+                    value = row.get(key)
+                elif key in row.index:
+                    value = row[key]
+                else:
+                    value = None
             
             if value is not None and pd.notna(value):
                 return int(float(str(value).split('.')[0]))
             return None
-        except (KeyError, ValueError, AttributeError):
+        except (KeyError, ValueError, AttributeError, IndexError):
             return None
     
     cross = {
-        'P_Sun': safe_get(row, 'P_Sun'),
-        'P_Earth': safe_get(row, 'P_Earth'),
-        'P_NorthNode': safe_get(row, 'P_NorthNode'),
-        'P_SouthNode': safe_get(row, 'P_SouthNode'),
-        'D_Sun': safe_get(row, 'D_Sun'),
-        'D_Earth': safe_get(row, 'D_Earth')
+        'P_Sun': safe_get_gate(row, 'P_Sun'),
+        'P_Earth': safe_get_gate(row, 'P_Earth'),
+        'P_NorthNode': safe_get_gate(row, 'P_NorthNode'),
+        'P_SouthNode': safe_get_gate(row, 'P_SouthNode'),
+        'D_Sun': safe_get_gate(row, 'D_Sun'),
+        'D_Earth': safe_get_gate(row, 'D_Earth')
     }
     return cross
 
+
 def analyze_person_hd(row):
-    """1行のデータから個人のHD分析を実行
+    """
+    1行のデータから個人のHD分析を実行
     
     Parameters:
         row: dict or pd.Series
+        
+    Returns:
+        dict: HD分析結果
     """
-    def safe_get(row, key, default='不明'):
+    def safe_get_value(row, key, default='不明'):
         """dictとSeriesの両方から安全に値を取得"""
         try:
             if isinstance(row, dict):
                 return row.get(key, default)
             else:
-                return row.get(key, default) if hasattr(row, 'get') else row[key] if key in row.index else default
+                if hasattr(row, 'get'):
+                    return row.get(key, default)
+                elif key in row.index:
+                    return row[key]
+                else:
+                    return default
         except (KeyError, AttributeError):
             return default
     
@@ -247,17 +288,16 @@ def analyze_person_hd(row):
         'defined_centers': list(defined_centers),
         'undefined_centers': undefined_centers,
         'incarnation_cross': incarnation_cross,
-        'type': safe_get(row, 'Type', '不明'),
-        'profile': safe_get(row, 'Profile', '不明'),
-        'definition': safe_get(row, 'Definition_Type', '不明'),
-        'authority': safe_get(row, 'Authority', '不明')
+        'type': safe_get_value(row, 'Type', '不明'),
+        'profile': safe_get_value(row, 'Profile', '不明'),
+        'definition': safe_get_value(row, 'Definition_Type', '不明'),
+        'authority': safe_get_value(row, 'Authority', '不明')
     }
 
-# テスト用
+
+# テスト用のmain関数
 if __name__ == "__main__":
-    import pandas as pd
-    
-    # サンプルデータ
+    # サンプルデータでテスト
     sample_row = {
         'JST_Time': '1900-01-01 00:00:00',
         'Type': 'Manifesting Generator',
